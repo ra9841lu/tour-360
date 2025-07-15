@@ -131,7 +131,7 @@ const nodes = [
 new Viewer({
     container: 'viewer',
     loadingImg: baseUrl + 'loader.gif',
-    touchmoveTwoFingers: true,
+    touchmoveTwoFingers: false,
     mousewheelCtrlKey: false,
     defaultYaw: '270deg',
     defaultZoomLvl: 10, // nivel de zoom al iniciar
