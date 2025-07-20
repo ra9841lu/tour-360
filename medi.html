@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medidor de Distancias en Plano</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+```
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+    }
+    
+    .main-container {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+    }
+    
+    .container {
+        display: flex;
+        height: 100vh;
+        gap: 0;
+        padding: 20px;
+        width: 100%;
+    }
+    
+    .map-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        overflow: hidden;
+        min-width: 300px;
+        position: relative;
+    }
+    
+    .resize-handle {
+        position: absolute;
+        right: -5px;
+        top: 0;
+        bottom: 0;
+        width: 10px;
+        cursor: ew-resize;
+        background: rgba(0,0,0,0.1);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .resize-handle:hover {
+        opacity: 1;
+    }
+    
+    .controls {
+        padding: 15px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .control-group {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+    
+    .dp-control {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+    
+    .select-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .select-wrapper label {
+        font-size: 12px;
+        color: #666;
+        font-weight: bold;
+    }
+    
+    select {
+        padding: 8px 12px;
+        border: 2px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        background: white;
+        cursor: pointer;
+        transition: border-color 0.3s;
+    }
+    
+    select:focus {
+        outline: none;
+        border-color: #007bff;
+    }
+    
+    #typeSelect {
+        min-width: 120px;
+    }
+    
+    #dpSelect {
+        min-width: 150px;
+        font-weight: bold;
+    }
+    
+    #map {
+        flex: 1;
+        z-index: 1;
+        position: relative;
+    }
+    
+    .crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        pointer-events: none;
+    }
+    
+    .crosshair-center {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #ff0000;
+        border-radius: 50%;
+        position: relative;
+    }
+    
+    .crosshair-center::before,
+    .crosshair-center::after {
+        content: '';
+        position: absolute;
+        background-color: #ff0000;
+    }
+    
+    .crosshair-center::before {
+        width: 2px;
+        height: 40px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .crosshair-center::after {
+        width: 40px;
+        height: 2px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .data-section {
+        width: 500px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        overflow-y: auto;
+        padding-left: 20px;
+        transition: width 0.3s;
+    }
+    
+    .panel {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .panel-header {
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .panel-header:hover {
+        background: #e9ecef;
+    }
+    
+    .panel-content {
+        padding: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+        transition: max-height 0.3s;
+    }
+    
+    .panel.collapsed .panel-content {
+        max-height: 0;
+        padding: 0 20px;
+    }
+    
+    .toggle-icon {
+        transition: transform 0.3s;
+    }
+    
+    .panel.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+    }
+    
+    h2 {
+        margin: 0;
+        color: #333;
+        font-size: 1.2em;
+    }
+    
+    h3 {
+        margin: 15px 0 10px 0;
+        color: #555;
+        font-size: 1em;
+        padding: 8px;
+        background: #f0f0f0;
+        border-radius: 5px;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    th, td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+        font-size: 13px;
+    }
+    
+    th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .action-btn {
+        padding: 5px 10px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    .action-btn:hover {
+        background: #c82333;
+    }
+    
+    .summary-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .summary-item {
+        text-align: center;
+        padding: 10px;
+        border-radius: 5px;
+        background: white;
+        border: 1px solid #ddd;
+    }
+    
+    .summary-item.tipo1 {
+        border-color: #ff4444;
+        background-color: rgba(255, 68, 68, 0.05);
+    }
+    
+    .summary-item.tipo2 {
+        border-color: #44ff44;
+        background-color: rgba(68, 255, 68, 0.05);
+    }
+    
+    .summary-item.tipo3 {
+        border-color: #4444ff;
+        background-color: rgba(68, 68, 255, 0.05);
+    }
+    
+    .summary-item.tipo4 {
+        border-color: #ff44ff;
+        background-color: rgba(255, 68, 255, 0.05);
+    }
+    
+    .summary-item.tipo5 {
+        border-color: #ffaa44;
+        background-color: rgba(255, 170, 68, 0.05);
+    }
+    
+    .summary-label {
+        font-size: 0.8em;
+        color: #666;
+    }
+    
+    .summary-value {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+        margin-top: 5px;
+    }
+    
+    .total-section {
+        text-align: center;
+        padding: 15px;
+        background: #333;
+        color: white;
+        border-radius: 8px;
+        margin-top: 10px;
+    }
+    
+    .btn-group {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+        font-size: 14px;
+    }
+    
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #0056b3;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+    
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #218838;
+    }
+    
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .btn-info:hover {
+        background: #138496;
+    }
+    
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .btn-warning:hover {
+        background: #e0a800;
+    }
+    
+    .input-group {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+    }
+    
+    .input-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .input-wrapper label {
+        font-size: 12px;
+        color: #666;
+        font-weight: bold;
+    }
+    
+    .input-wrapper input {
+        padding: 8px;
+        border: 2px solid #ddd;
+        border-radius: 5px;
+        width: 100px;
+        transition: border-color 0.3s;
+    }
+    
+    .input-wrapper input:focus {
+        outline: none;
+        border-color: #007bff;
+    }
+    
+    .distance-label {
+        background-color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        border: 2px solid;
+        font-weight: bold;
+        font-size: 14px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .dp-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #e9ecef;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .report-view {
+        display: none;
+        padding: 20px;
+        background: white;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    
+    .report-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .report-header h1 {
+        color: #333;
+        margin-bottom: 10px;
+    }
+    
+    .report-section {
+        margin-bottom: 30px;
+        page-break-inside: avoid;
+    }
+    
+    .no-print {
+        display: block;
+    }
+    
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        
+        .report-view {
+            display: block !important;
+        }
+        
+        .main-container {
+            display: none !important;
+        }
+    }
+    
+    .map-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .map-control-btn {
+        background: white;
+        border: 2px solid rgba(0,0,0,0.2);
+        border-radius: 4px;
+        padding: 5px;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+    
+    .map-control-btn:hover {
+        background: #f0f0f0;
+    }
+    
+    .map-control-btn.active {
+        background: #007bff;
+        color: white;
+    }
+    
+    @media (max-width: 768px) {
+        .container {
+            flex-direction: column;
+            padding: 10px;
+        }
+        
+        .data-section {
+            width: 100%;
+            padding-left: 0;
+            padding-top: 20px;
+        }
+        
+        .control-group {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .input-group {
+            flex-wrap: wrap;
+        }
+        
+        .resize-handle {
+            display: none;
+        }
+    }
+    
+    .custom-marker {
+        background-color: #ff6b6b;
+        border: 2px solid white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+</style>
+```
+
+</head>
+<body>
+    <div class="main-container">
+        <div class="container" id="mainView">
+            <div class="map-section" id="mapSection">
+                <div class="resize-handle" id="resizeHandle"></div>
+                <div class="controls">
+                    <div class="control-group">
+                        <div class="dp-control">
+                            <div class="select-wrapper">
+                                <label for="dpSelect">DP/Zona activa:</label>
+                                <select id="dpSelect">
+                                    <option value="">Seleccionar DP</option>
+                                </select>
+                            </div>
+                            <div class="input-wrapper">
+                                <label for="newDpInput">Nuevo DP:</label>
+                                <input type="text" id="newDpInput" placeholder="DP20" style="width: 80px;">
+                            </div>
+                            <button class="btn btn-warning" onclick="addNewDP()">Añadir DP</button>
+                        </div>
+                        <button class="btn btn-info" onclick="toggleReportView()">Ver Informe Completo</button>
+                    </div>
+                    <div class="control-group">
+                        <div class="select-wrapper">
+                            <label for="typeSelect">Tipo de medición:</label>
+                            <select id="typeSelect">
+                                <option value="tipo1">Tipo 1</option>
+                                <option value="tipo2">Tipo 2</option>
+                                <option value="tipo3">Tipo 3</option>
+                                <option value="tipo4">Tipo 4</option>
+                                <option value="tipo5">Tipo 5</option>
+                            </select>
+                        </div>
+                        <div class="select-wrapper">
+                            <label for="teamSelect">Equipo:</label>
+                            <select id="teamSelect">
+                                <option value="equipo1">Equipo 1</option>
+                                <option value="equipo2">Equipo 2</option>
+                                <option value="equipo3">Equipo 3</option>
+                            </select>
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="manualMeters">Metros:</label>
+                            <input type="number" id="manualMeters" placeholder="Ej: 125.5" step="0.1">
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <div class="btn-group">
+                            <button class="btn btn-success" onclick="addPointFromCrosshair()">Agregar Punto</button>
+                            <button class="btn btn-primary" onclick="finishCurrentMeasurement()">Finalizar Medición</button>
+                            <button class="btn btn-secondary" onclick="cancelCurrentMeasurement()">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="map">
+                    <div class="crosshair">
+                        <div class="crosshair-center"></div>
+                    </div>
+                    <div class="map-controls">
+                        <button class="map-control-btn" id="satelliteToggle" title="Vista Satélite">🛰️</button>
+                    </div>
+                </div>
+            </div>
+
+```
+        <div class="data-section" id="dataSection">
+            <div class="panel" id="measurementsPanel">
+                <div class="panel-header" onclick="togglePanel('measurementsPanel')">
+                    <h2>Mediciones Realizadas</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="panel-content">
+                    <div id="measurementsByDP"></div>
+                </div>
+            </div>
+            
+            <div class="panel" id="summaryPanel">
+                <div class="panel-header" onclick="togglePanel('summaryPanel')">
+                    <h2>Resumen Total por Tipo</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="panel-content">
+                    <div class="summary-section">
+                        <div class="summary-grid" id="totalSummary">
+                            <!-- Se llenará dinámicamente -->
+                        </div>
+                        <div class="total-section">
+                            <div class="summary-label">TOTAL GENERAL</div>
+                            <div class="summary-value" id="totalGeneral">0 m</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel" id="dpSummaryPanel">
+                <div class="panel-header" onclick="togglePanel('dpSummaryPanel')">
+                    <h2>Resumen por DP/Zona</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="panel-content">
+                    <div id="dpSummaries">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="report-view" id="reportView">
+        <div class="no-print" style="margin-bottom: 20px;">
+            <button class="btn btn-primary" onclick="toggleReportView()">Volver al Mapa</button>
+            <button class="btn btn-success" onclick="window.print()">Imprimir Informe</button>
+        </div>
+        <div id="reportContent">
+            <!-- Se llenará dinámicamente -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Esperar a que el DOM esté completamente cargado
+    document.addEventListener('DOMContentLoaded', function() {
+        // Verificar que Leaflet esté cargado
+        if (typeof L === 'undefined') {
+            console.error('Leaflet no está cargado');
+            alert('Error al cargar el mapa. Por favor, recarga la página.');
+            return;
+        }
+        
+        // Inicialización del mapa
+        const map = L.map('map', {
+            center: [-34.6037, -58.3816], // Buenos Aires como ejemplo
+            zoom: 16,
+            zoomControl: true
+        });
+        
+        // Capas del mapa
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 22,
+            maxNativeZoom: 19
+        });
+        
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '© Esri',
+            maxZoom: 22,
+            maxNativeZoom: 19
+        });
+        
+        streetLayer.addTo(map);
+        let currentLayer = 'street';
+        
+        // Toggle vista satélite
+        document.getElementById('satelliteToggle').addEventListener('click', function() {
+            if (currentLayer === 'street') {
+                map.removeLayer(streetLayer);
+                satelliteLayer.addTo(map);
+                currentLayer = 'satellite';
+                this.classList.add('active');
+            } else {
+                map.removeLayer(satelliteLayer);
+                streetLayer.addTo(map);
+                currentLayer = 'street';
+                this.classList.remove('active');
+            }
+        });
+        
+        // Variables globales
+        let currentMeasurement = {
+            points: [],
+            markers: [],
+            polyline: null,
+            type: 'tipo1',
+            team: 'equipo1',
+            manualDistance: 0,
+            calculatedDistance: 0,
+            distanceLabel: null,
+            dp: null
+        };
+        
+        let measurements = [];
+        let measurementIdCounter = 1;
+        let dpList = [];
+        let activeLayers = new Map(); // Para manejar las capas por DP
+        
+        // Colores para cada tipo
+        const typeColors = {
+            tipo1: '#ff4444',
+            tipo2: '#44ff44',
+            tipo3: '#4444ff',
+            tipo4: '#ff44ff',
+            tipo5: '#ffaa44'
+        };
+        
+        // Nombres más descriptivos para los tipos
+        const typeNames = {
+            tipo1: 'Tipo 1',
+            tipo2: 'Tipo 2',
+            tipo3: 'Tipo 3',
+            tipo4: 'Tipo 4',
+            tipo5: 'Tipo 5'
+        };
+        
+        // Nombres para los equipos
+        const teamNames = {
+            equipo1: 'Equipo 1',
+            equipo2: 'Equipo 2',
+            equipo3: 'Equipo 3'
+        };
+        
+        // Event listener para el selector de tipo
+        document.getElementById('typeSelect').addEventListener('change', function() {
+            currentMeasurement.type = this.value;
+            updateCurrentPolyline();
+        });
+        
+        // Event listener para el selector de equipo
+        document.getElementById('teamSelect').addEventListener('change', function() {
+            currentMeasurement.team = this.value;
+            localStorage.setItem('lastTeam', this.value);
+        });
+        
+        // Event listener para el selector de DP
+        document.getElementById('dpSelect').addEventListener('change', function() {
+            const selectedDP = this.value;
+            localStorage.setItem('lastDP', selectedDP);
+            showDPMeasurements(selectedDP);
+        });
+        
+        // Función para agregar nuevo DP
+        window.addNewDP = function() {
+            const newDpInput = document.getElementById('newDpInput');
+            const dp = newDpInput.value.trim();
+            
+            if (!dp) {
+                alert('Por favor, ingresa un nombre de DP válido');
+                return;
+            }
+            
+            if (dpList.includes(dp)) {
+                alert('Este DP ya existe');
+                return;
+            }
+            
+            dpList.push(dp);
+            updateDPSelect();
+            document.getElementById('dpSelect').value = dp;
+            localStorage.setItem('lastDP', dp);
+            localStorage.setItem('dpList', JSON.stringify(dpList));
+            newDpInput.value = '';
+            showDPMeasurements(dp);
+        }
+        
+        // Actualizar selector de DP
+        function updateDPSelect() {
+            const dpSelect = document.getElementById('dpSelect');
+            const currentValue = dpSelect.value;
+            
+            dpSelect.innerHTML = '<option value="">Todos los DPs</option>';
+            dpList.forEach(dp => {
+                const option = document.createElement('option');
+                option.value = dp;
+                option.textContent = dp;
+                dpSelect.appendChild(option);
+            });
+            
+            if (currentValue && dpList.includes(currentValue)) {
+                dpSelect.value = currentValue;
+            }
+        }
+        
+        // Mostrar mediciones de un DP específico
+        function showDPMeasurements(dp) {
+            // Ocultar todas las mediciones
+            measurements.forEach(measurement => {
+                if (measurement.polyline) measurement.polyline.setStyle({ opacity: 0 });
+                if (measurement.distanceLabel) map.removeLayer(measurement.distanceLabel);
+                measurement.markers.forEach(marker => marker.setOpacity(0));
+            });
+            
+            // Mostrar solo las del DP seleccionado o todas si no hay selección
+            measurements.forEach(measurement => {
+                if (!dp || measurement.dp === dp) {
+                    if (measurement.polyline) measurement.polyline.setStyle({ opacity: 0.8 });
+                    if (measurement.distanceLabel) measurement.distanceLabel.addTo(map);
+                    measurement.markers.forEach(marker => marker.setOpacity(1));
+                }
+            });
+            
+            updateTables();
+        }
+        
+        // Función para crear marcador personalizado
+        function createCustomIcon() {
+            return L.divIcon({
+                className: 'custom-marker',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+        }
+        
+        // Función para agregar punto desde el crosshair
+        window.addPointFromCrosshair = function() {
+            const center = map.getCenter();
+            addPoint(center);
+        }
+        
+        // Función para agregar un punto
+        function addPoint(latlng) {
+            const marker = L.marker(latlng, {
+                draggable: true,
+                icon: createCustomIcon()
+            }).addTo(map);
+            
+            // Evento cuando se arrastra el marcador
+            marker.on('drag', function() {
+                updateMeasurement();
+            });
+            
+            currentMeasurement.points.push(latlng);
+            currentMeasurement.markers.push(marker);
+            
+            updateMeasurement();
+        }
+        
+        // Actualizar la medición actual
+        function updateMeasurement() {
+            // Actualizar coordenadas de los puntos desde los marcadores
+            currentMeasurement.points = currentMeasurement.markers.map(marker => marker.getLatLng());
+            
+            if (currentMeasurement.points.length > 1) {
+                updateCurrentPolyline();
+                calculateDistance();
+            }
+        }
+        
+        // Actualizar la polilínea actual
+        function updateCurrentPolyline() {
+            if (currentMeasurement.polyline) {
+                map.removeLayer(currentMeasurement.polyline);
+            }
+            
+            if (currentMeasurement.points.length > 1) {
+                currentMeasurement.polyline = L.polyline(currentMeasurement.points, {
+                    color: typeColors[currentMeasurement.type],
+                    weight: 4,
+                    opacity: 0.8
+                }).addTo(map);
+            }
+        }
+        
+        // Calcular distancia total
+        function calculateDistance() {
+            let totalDistance = 0;
+            for (let i = 0; i < currentMeasurement.points.length - 1; i++) {
+                totalDistance += currentMeasurement.points[i].distanceTo(currentMeasurement.points[i + 1]);
+            }
+            currentMeasurement.calculatedDistance = totalDistance;
+        }
+        
+        // Crear etiqueta de distancia
+        function createDistanceLabel(polyline, distance, type) {
+            const bounds = polyline.getBounds();
+            const center = bounds.getCenter();
+            
+            const label = L.divIcon({
+                className: 'distance-label',
+                html: `<div style="border-color: ${typeColors[type]}; color: ${typeColors[type]}">${distance.toFixed(1)} m</div>`,
+                iconSize: [80, 30],
+                iconAnchor: [40, 15]
+            });
+            
+            return L.marker(center, {
+                icon: label,
+                interactive: false
+            }).addTo(map);
+        }
+        
+        // Finalizar medición actual
+        window.finishCurrentMeasurement = function() {
+            if (currentMeasurement.points.length < 2) {
+                alert('Necesitas al menos 2 puntos para crear una medición');
+                return;
+            }
+            
+            const dp = document.getElementById('dpSelect').value;
+            
+            if (!dp) {
+                alert('Por favor, selecciona o crea un DP/Zona');
+                return;
+            }
+            
+            // Obtener distancia manual
+            const manualInput = document.getElementById('manualMeters');
+            const manualDistance = parseFloat(manualInput.value) || currentMeasurement.calculatedDistance;
+            
+            // Crear etiqueta de distancia
+            const distanceLabel = createDistanceLabel(
+                currentMeasurement.polyline, 
+                manualDistance, 
+                currentMeasurement.type
+            );
+            
+            // Guardar la medición
+            const measurement = {
+                id: measurementIdCounter++,
+                type: currentMeasurement.type,
+                team: currentMeasurement.team,
+                dp: dp,
+                manualDistance: manualDistance,
+                calculatedDistance: currentMeasurement.calculatedDistance,
+                points: [...currentMeasurement.points],
+                polyline: currentMeasurement.polyline,
+                markers: currentMeasurement.markers,
+                distanceLabel: distanceLabel
+            };
+            
+            measurements.push(measurement);
+            
+            // Actualizar tabla y resumen
+            updateTables();
+            updateSummaries();
+            
+            // Resetear medición actual
+            resetCurrentMeasurement();
+            
+            // Limpiar input manual
+            manualInput.value = '';
+        }
+        
+        // Cancelar medición actual
+        window.cancelCurrentMeasurement = function() {
+            // Eliminar marcadores y polilínea del mapa
+            currentMeasurement.markers.forEach(marker => map.removeLayer(marker));
+            if (currentMeasurement.polyline) {
+                map.removeLayer(currentMeasurement.polyline);
+            }
+            if (currentMeasurement.distanceLabel) {
+                map.removeLayer(currentMeasurement.distanceLabel);
+            }
+            
+            resetCurrentMeasurement();
+            document.getElementById('manualMeters').value = '';
+        }
+        
+        // Resetear medición actual
+        function resetCurrentMeasurement() {
+            currentMeasurement = {
+                points: [],
+                markers: [],
+                polyline: null,
+                type: document.getElementById('typeSelect').value,
+                team: document.getElementById('teamSelect').value,
+                manualDistance: 0,
+                calculatedDistance: 0,
+                distanceLabel: null,
+                dp: document.getElementById('dpSelect').value
+            };
+        }
+        
+        // Actualizar tablas agrupadas por DP
+        function updateTables() {
+            const container = document.getElementById('measurementsByDP');
+            container.innerHTML = '';
+            
+            const selectedDP = document.getElementById('dpSelect').value;
+            
+            // Filtrar mediciones según DP seleccionado
+            const filteredMeasurements = selectedDP 
+                ? measurements.filter(m => m.dp === selectedDP)
+                : measurements;
+            
+            // Agrupar mediciones por DP
+            const measurementsByDP = {};
+            filteredMeasurements.forEach(measurement => {
+                if (!measurementsByDP[measurement.dp]) {
+                    measurementsByDP[measurement.dp] = [];
+                }
+                measurementsByDP[measurement.dp].push(measurement);
+            });
+            
+            // Ordenar DPs
+            const sortedDPs = Object.keys(measurementsByDP).sort((a, b) => {
+                // Extraer números de los DPs para ordenar numéricamente
+                const numA = parseInt(a.replace(/\D/g, '')) || 0;
+                const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                return numA - numB;
+            });
+            
+            // Crear tabla para cada DP
+            sortedDPs.forEach(dp => {
+                const dpSection = document.createElement('div');
+                dpSection.style.marginBottom = '20px';
+                
+                const dpTotal = measurementsByDP[dp].reduce((sum, m) => sum + m.manualDistance, 0);
+                
+                dpSection.innerHTML = `
+                    <div class="dp-header">
+                        <span>DP/Zona: ${dp}</span>
+                        <span>Total: ${dpTotal.toFixed(2)} m</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tipo</th>
+                                <th>Equipo</th>
+                                <th>M. Manual</th>
+                                <th>M. Calculado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${measurementsByDP[dp].map(measurement => `
+                                <tr>
+                                    <td>${measurement.id}</td>
+                                    <td><span style="color: ${typeColors[measurement.type]}">●</span> ${typeNames[measurement.type]}</td>
+                                    <td>${teamNames[measurement.team] || measurement.team}</td>
+                                    <td>${measurement.manualDistance.toFixed(2)}</td>
+                                    <td>${measurement.calculatedDistance.toFixed(2)}</td>
+                                    <td><button class="action-btn" onclick="deleteMeasurement(${measurement.id})">Eliminar</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                container.appendChild(dpSection);
+            });
+        }
+        
+        // Eliminar medición
+        window.deleteMeasurement = function(id) {
+            const measurementIndex = measurements.findIndex(m => m.id === id);
+            if (measurementIndex !== -1) {
+                const measurement = measurements[measurementIndex];
+                
+                // Eliminar del mapa
+                measurement.markers.forEach(marker => map.removeLayer(marker));
+                if (measurement.polyline) {
+                    map.removeLayer(measurement.polyline);
+                }
+                if (measurement.distanceLabel) {
+                    map.removeLayer(measurement.distanceLabel);
+                }
+                
+                // Eliminar del array
+                measurements.splice(measurementIndex, 1);
+                
+                // Actualizar tabla y resumen
+                updateTables();
+                updateSummaries();
+            }
+        }
+        
+        // Actualizar resúmenes
+        function updateSummaries() {
+            // Resumen total por tipo
+            const totalsByType = {
+                tipo1: 0,
+                tipo2: 0,
+                tipo3: 0,
+                tipo4: 0,
+                tipo5: 0
+            };
+            
+            measurements.forEach(measurement => {
+                totalsByType[measurement.type] += measurement.manualDistance;
+            });
+            
+            // Actualizar resumen total
+            const totalSummaryHtml = Object.keys(totalsByType).map(type => `
+                <div class="summary-item ${type}">
+                    <div class="summary-label">${typeNames[type]}</div>
+                    <div class="summary-value">${totalsByType[type].toFixed(2)} m</div>
+                </div>
+            `).join('');
+            
+            document.getElementById('totalSummary').innerHTML = totalSummaryHtml;
+            
+            const totalGeneral = Object.values(totalsByType).reduce((sum, val) => sum + val, 0);
+            document.getElementById('totalGeneral').textContent = totalGeneral.toFixed(2) + ' m';
+            
+            // Resumen por DP
+            const dpSummariesContainer = document.getElementById('dpSummaries');
+            dpSummariesContainer.innerHTML = '';
+            
+            // Agrupar por DP
+            const summaryByDP = {};
+            measurements.forEach(measurement => {
+                if (!summaryByDP[measurement.dp]) {
+                    summaryByDP[measurement.dp] = {
+                        tipo1: 0,
+                        tipo2: 0,
+                        tipo3: 0,
+                        tipo4: 0,
+                        tipo5: 0
+                    };
+                }
+                summaryByDP[measurement.dp][measurement.type] += measurement.manualDistance;
+            });
+            
+            // Crear resumen para cada DP
+            const sortedDPs = Object.keys(summaryByDP).sort((a, b) => {
+                const numA = parseInt(a.replace(/\D/g, '')) || 0;
+                const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                return numA - numB;
+            });
+            
+            sortedDPs.forEach(dp => {
+                const dpSection = document.createElement('div');
+                dpSection.className = 'summary-section';
+                
+                const dpTotal = Object.values(summaryByDP[dp]).reduce((sum, val) => sum + val, 0);
+                
+                dpSection.innerHTML = `
+                    <h3>DP/Zona ${dp} - Total: ${dpTotal.toFixed(2)} m</h3>
+                    <div class="summary-grid">
+                        ${Object.keys(summaryByDP[dp]).map(type => `
+                            <div class="summary-item ${type}">
+                                <div class="summary-label">${typeNames[type]}</div>
+                                <div class="summary-value">${summaryByDP[dp][type].toFixed(2)} m</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                dpSummariesContainer.appendChild(dpSection);
+            });
+        }
+        
+        // Toggle panel collapse
+        window.togglePanel = function(panelId) {
+            const panel = document.getElementById(panelId);
+            panel.classList.toggle('collapsed');
+        }
+        
+        // Toggle vista de informe
+        window.toggleReportView = function() {
+            const mainView = document.getElementById('mainView');
+            const reportView = document.getElementById('reportView');
+            
+            if (reportView.style.display === 'none' || !reportView.style.display) {
+                // Generar informe
+                generateReport();
+                mainView.style.display = 'none';
+                reportView.style.display = 'block';
+            } else {
+                mainView.style.display = 'flex';
+                reportView.style.display = 'none';
+            }
+        }
+        
+        // Generar informe completo
+        function generateReport() {
+            const reportContent = document.getElementById('reportContent');
+            const date = new Date().toLocaleDateString('es-ES');
+            
+            let html = `
+                <div class="report-header">
+                    <h1>Informe de Mediciones</h1>
+                    <p>Fecha: ${date}</p>
+                    <p>Total de mediciones: ${measurements.length}</p>
+                </div>
+            `;
+            
+            // Resumen general
+            const totalGeneral = measurements.reduce((sum, m) => sum + m.manualDistance, 0);
+            html += `
+                <div class="report-section">
+                    <h2>Resumen General</h2>
+                    <p><strong>Total General:</strong> ${totalGeneral.toFixed(2)} metros</p>
+                </div>
+            `;
+            
+            // Resumen por tipo
+            const totalsByType = {
+                tipo1: 0,
+                tipo2: 0,
+                tipo3: 0,
+                tipo4: 0,
+                tipo5: 0
+            };
+            
+            measurements.forEach(measurement => {
+                totalsByType[measurement.type] += measurement.manualDistance;
+            });
+            
+            html += `
+                <div class="report-section">
+                    <h2>Resumen por Tipo de Medición</h2>
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Total (m)</th>
+                                <th>Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.keys(totalsByType).map(type => {
+                                const percentage = totalGeneral > 0 ? (totalsByType[type] / totalGeneral * 100).toFixed(2) : 0;
+                                return `
+                                    <tr>
+                                        <td>${typeNames[type]}</td>
+                                        <td>${totalsByType[type].toFixed(2)}</td>
+                                        <td>${percentage}%</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            // Detalle por DP
+            const measurementsByDP = {};
+            measurements.forEach(measurement => {
+                if (!measurementsByDP[measurement.dp]) {
+                    measurementsByDP[measurement.dp] = [];
+                }
+                measurementsByDP[measurement.dp].push(measurement);
+            });
+            
+            const sortedDPs = Object.keys(measurementsByDP).sort((a, b) => {
+                const numA = parseInt(a.replace(/\D/g, '')) || 0;
+                const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                return numA - numB;
+            });
+            
+            sortedDPs.forEach(dp => {
+                const dpMeasurements = measurementsByDP[dp];
+                const dpTotal = dpMeasurements.reduce((sum, m) => sum + m.manualDistance, 0);
+                
+                html += `
+                    <div class="report-section">
+                        <h2>DP/Zona: ${dp}</h2>
+                        <p><strong>Total DP:</strong> ${dpTotal.toFixed(2)} metros</p>
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Tipo</th>
+                                    <th>Equipo</th>
+                                    <th>Metros Manual</th>
+                                    <th>Metros Calculado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${dpMeasurements.map(m => `
+                                    <tr>
+                                        <td>${m.id}</td>
+                                        <td>${typeNames[m.type]}</td>
+                                        <td>${teamNames[m.team]}</td>
+                                        <td>${m.manualDistance.toFixed(2)}</td>
+                                        <td>${m.calculatedDistance.toFixed(2)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            
+            reportContent.innerHTML = html;
+        }
+        
+        // Resize functionality
+        const resizeHandle = document.getElementById('resizeHandle');
+        const mapSection = document.getElementById('mapSection');
+        const dataSection = document.getElementById('dataSection');
+        let isResizing = false;
+        
+        resizeHandle.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            document.body.style.cursor = 'ew-resize';
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (!isResizing) return;
+            
+            const containerWidth = document.getElementById('mainView').offsetWidth;
+            const newMapWidth = e.clientX - 20; // 20px for padding
+            const newDataWidth = containerWidth - newMapWidth - 40; // 40px for total padding
+            
+            if (newMapWidth > 300 && newDataWidth > 300) {
+                mapSection.style.flex = 'none';
+                mapSection.style.width = newMapWidth + 'px';
+                dataSection.style.width = newDataWidth + 'px';
+            }
+        });
+        
+        document.addEventListener('mouseup', function() {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+        });
+        
+        // Atajos de teclado
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.target.matches('input')) {
+                addPointFromCrosshair();
+            } else if (e.key === 'Escape') {
+                cancelCurrentMeasurement();
+            }
+        });
+        
+        // Cargar datos guardados
+        const savedTeam = localStorage.getItem('lastTeam');
+        if (savedTeam) {
+            document.getElementById('teamSelect').value = savedTeam;
+        }
+        
+        const savedDPList = localStorage.getItem('dpList');
+        if (savedDPList) {
+            dpList = JSON.parse(savedDPList);
+            updateDPSelect();
+        }
+        
+        const savedDP = localStorage.getItem('lastDP');
+        if (savedDP && dpList.includes(savedDP)) {
+            document.getElementById('dpSelect').value = savedDP;
+            showDPMeasurements(savedDP);
+        }
+        
+        // Instrucciones iniciales
+        setTimeout(() => {
+            alert('Nuevas funcionalidades:\n\n1. Crea DPs con el botón "Añadir DP"\n2. Cambia entre DPs para ver solo sus mediciones\n3. Ajusta el tamaño del mapa arrastrando el borde\n4. Cambia a vista satélite con el botón 🛰️\n5. Ve el informe completo con el botón "Ver Informe"\n6. Los paneles se pueden colapsar haciendo clic en el título\n\nAtalhos: Enter = Agregar Punto | Escape = Cancelar');
+        }, 1000);
+    });
+</script>
+```
+
+</body>
+</html>
